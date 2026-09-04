@@ -28,27 +28,17 @@ export default function Register() {
       setRole(roleParam);
     }
 
-    if (window.recaptchaVerifier) {
-      window.recaptchaVerifier.clear();
-      window.recaptchaVerifier = null;
+    if (!window.recaptchaVerifier) {
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        'size': 'invisible',
+        'callback': (response) => {
+          // reCAPTCHA solved
+        },
+        'expired-callback': () => {
+          setError('reCAPTCHA expired. Please try again.');
+        }
+      });
     }
-    
-    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-      'size': 'invisible',
-      'callback': (response) => {
-        // reCAPTCHA solved
-      },
-      'expired-callback': () => {
-        setError('reCAPTCHA expired. Please try again.');
-      }
-    });
-
-    return () => {
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-        window.recaptchaVerifier = null;
-      }
-    };
   }, [location]);
 
   const handleSendOtp = async (e) => {
@@ -113,8 +103,6 @@ export default function Register() {
               {error}
             </div>
           )}
-          
-          <div id="recaptcha-container"></div>
           
           {step === 1 ? (
             <form onSubmit={handleSendOtp} className="space-y-5">
