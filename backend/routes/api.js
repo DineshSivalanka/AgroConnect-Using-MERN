@@ -4,55 +4,51 @@ import * as productListingController from '../controllers/productListingControll
 import * as purchaseRequestController from '../controllers/purchaseRequestController.js';
 import * as orderController from '../controllers/orderController.js';
 import * as chatController from '../controllers/chatController.js';
-import * as otpController from '../controllers/otpController.js';
 import * as adminController from '../controllers/adminController.js';
 import * as reviewController from '../controllers/reviewController.js';
+import { verifyToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 // Review Routes
-router.post('/reviews', reviewController.createReview);
+router.post('/reviews', verifyToken, reviewController.createReview);
 router.get('/reviews/farmer/:farmerId', reviewController.getFarmerReviews);
 
 // Admin Routes
-router.get('/admin/stats', adminController.getStats);
-router.get('/admin/users', adminController.getUsers);
-router.delete('/admin/users/:id', adminController.deleteUser);
+router.get('/admin/stats', verifyToken, adminController.getStats);
+router.get('/admin/users', verifyToken, adminController.getUsers);
+router.delete('/admin/users/:id', verifyToken, adminController.deleteUser);
 
 // User Routes
-router.get('/users', userController.getUsers);
+router.get('/users', verifyToken, userController.getUsers);
 router.post('/users/register', userController.createUser);
 router.post('/users/login', userController.loginUser);
-router.get('/users/:id', userController.getUserById);
-router.put('/users/:id', userController.updateUser);
-router.put('/users/:id/verify', userController.verifyUser);
+router.get('/users/:id', verifyToken, userController.getUserById);
+router.put('/users/:id', verifyToken, userController.updateUser);
+router.put('/users/:id/verify', verifyToken, userController.verifyUser);
 
 // Product Listing Routes
 router.get('/listings', productListingController.getListings);
 router.get('/listings/farmer/:farmerId', productListingController.getListingsByFarmer);
-router.post('/listings', productListingController.createListing);
-router.put('/listings/:id', productListingController.updateListing);
-router.delete('/listings/:id', productListingController.deleteListing);
+router.post('/listings', verifyToken, productListingController.createListing);
+router.put('/listings/:id', verifyToken, productListingController.updateListing);
+router.delete('/listings/:id', verifyToken, productListingController.deleteListing);
 
 // Purchase Request Routes
-router.get('/requests/buyer/:buyerId', purchaseRequestController.getRequestsByBuyer);
-router.get('/requests/farmer/:farmerId', purchaseRequestController.getRequestsByFarmer);
-router.post('/requests', purchaseRequestController.createPurchaseRequest);
-router.put('/requests/:id/:action', purchaseRequestController.updatePurchaseRequestStatus);
+router.get('/requests/buyer/:buyerId', verifyToken, purchaseRequestController.getRequestsByBuyer);
+router.get('/requests/farmer/:farmerId', verifyToken, purchaseRequestController.getRequestsByFarmer);
+router.post('/requests', verifyToken, purchaseRequestController.createPurchaseRequest);
+router.put('/requests/:id/:action', verifyToken, purchaseRequestController.updatePurchaseRequestStatus);
 
 // Order Routes
-router.get('/orders/user/:userId', orderController.getOrdersByUser);
-router.get('/orders', orderController.getOrders);
-router.post('/orders', orderController.createOrder);
-router.put('/orders/:id/status', orderController.updateOrderStatus);
+router.get('/orders/user/:userId', verifyToken, orderController.getOrdersByUser);
+router.get('/orders', verifyToken, orderController.getOrders);
+router.post('/orders', verifyToken, orderController.createOrder);
+router.put('/orders/:id/status', verifyToken, orderController.updateOrderStatus);
 
 // Chat Routes
-router.get('/chat/contacts/:userId', chatController.getContacts);
-router.get('/chat/history/:userId/:contactId', chatController.getHistory);
-router.post('/chat', chatController.sendMessage);
-
-// OTP Routes
-router.post('/otp/generate', otpController.generateOtp);
-router.post('/otp/verify', otpController.verifyOtp);
+router.get('/chat/contacts/:userId', verifyToken, chatController.getContacts);
+router.get('/chat/history/:userId/:contactId', verifyToken, chatController.getHistory);
+router.post('/chat', verifyToken, chatController.sendMessage);
 
 export default router;

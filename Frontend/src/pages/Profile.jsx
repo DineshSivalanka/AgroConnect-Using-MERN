@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { request } from '../api';
+import { Card, CardBody } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
+import { Button } from '../components/ui/Button';
 
 export default function Profile() {
   const [name, setName] = useState('');
@@ -47,61 +50,90 @@ export default function Profile() {
   };
 
   return (
-    <div className="flex justify-center items-center flex-grow py-12">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
-        <h2 className="text-3xl font-extrabold text-center text-gray-800 mb-8">My Profile</h2>
-        {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-6 text-center font-medium border border-red-100">{error}</div>}
-        {success && <div className="bg-green-50 text-green-600 p-4 rounded-xl mb-6 text-center font-medium border border-green-100">{success}</div>}
+    <div className="flex justify-center items-center flex-grow py-12 px-4 animate-fadeIn">
+      <div className="w-full max-w-md relative">
+        {/* Decorative background elements */}
+        <div className="absolute -top-10 -left-10 w-32 h-32 bg-green-200 rounded-full mix-blend-multiply filter blur-2xl opacity-70 animate-blob"></div>
+        <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-amber-200 rounded-full mix-blend-multiply filter blur-2xl opacity-70 animate-blob animation-delay-2000"></div>
         
-        <form onSubmit={handleUpdate} className="space-y-6">
-          <div>
-            <label className="block text-gray-700 font-semibold mb-2">Role</label>
-            <input 
-              type="text" 
-              className="w-full border border-gray-300 rounded-xl p-3 bg-gray-100 cursor-not-allowed text-gray-500"
-              value={role}
-              disabled
-            />
-            <p className="text-xs text-gray-500 mt-1">Role cannot be changed.</p>
-          </div>
-          <div>
-            <label className="block text-gray-700 font-semibold mb-2">Full Name</label>
-            <input 
-              type="text" 
-              className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-green-500 focus:outline-none transition-all"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-gray-700 font-semibold mb-2">Phone Number</label>
-            <input 
-              type="text" 
-              className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-green-500 focus:outline-none transition-all"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-gray-700 font-semibold mb-2">Location</label>
-            <input 
-              type="text" 
-              className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-green-500 focus:outline-none transition-all"
-              value={locationStr}
-              onChange={(e) => setLocationStr(e.target.value)}
-              required
-            />
-          </div>
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full bg-green-600 text-white rounded-xl p-4 font-bold hover:bg-green-700 transition-colors shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Updating...' : 'UPDATE PROFILE'}
-          </button>
-        </form>
+        <Card className="relative z-10 backdrop-blur-sm bg-white/90 shadow-2xl border-white border-2">
+          <CardBody className="p-8">
+            <div className="text-center mb-10">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 text-white rounded-full text-3xl font-black mb-4 shadow-lg border-4 border-white">
+                {name ? name.charAt(0).toUpperCase() : '👤'}
+              </div>
+              <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">My Profile</h2>
+              <p className="text-gray-500 font-medium mt-1">Manage your account details</p>
+            </div>
+
+            {error && (
+              <div className="bg-rose-50 text-rose-600 p-4 rounded-2xl mb-6 text-sm font-medium border border-rose-100 flex items-start gap-2">
+                <span className="mt-0.5">⚠️</span>
+                <span>{error}</span>
+              </div>
+            )}
+            
+            {success && (
+              <div className="bg-emerald-50 text-emerald-600 p-4 rounded-2xl mb-6 text-sm font-medium border border-emerald-100 flex items-start gap-2">
+                <span className="mt-0.5">✅</span>
+                <span>{success}</span>
+              </div>
+            )}
+            
+            <form onSubmit={handleUpdate} className="space-y-6">
+              <div>
+                <Input 
+                  label="Role"
+                  type="text" 
+                  value={role}
+                  disabled
+                  icon="👤"
+                />
+                <p className="text-xs text-gray-400 mt-2 font-medium flex items-center gap-1">
+                  <span className="opacity-70">ℹ️</span> Role cannot be changed.
+                </p>
+              </div>
+              
+              <Input 
+                label="Full Name"
+                type="text" 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                icon="📝"
+              />
+              
+              <Input 
+                label="Phone Number"
+                type="tel" 
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                icon="📱"
+              />
+              
+              <Input 
+                label="Location"
+                type="text" 
+                value={locationStr}
+                onChange={(e) => setLocationStr(e.target.value)}
+                required
+                icon="📍"
+                placeholder="City, State"
+              />
+              
+              <div className="pt-4">
+                <Button 
+                  type="submit" 
+                  isLoading={loading}
+                  className="w-full py-4 text-lg"
+                >
+                  Save Changes
+                </Button>
+              </div>
+            </form>
+          </CardBody>
+        </Card>
       </div>
     </div>
   );
