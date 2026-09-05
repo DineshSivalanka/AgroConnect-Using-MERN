@@ -3,31 +3,33 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { request } from '../api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { useAuth } from '../context/AuthContext';
+import { MessageSquare, Mail, MapPin, Smile, MessageCircle } from 'lucide-react';
 
 export default function Messages() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [selectedContact, setSelectedContact] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const { dbUser: user } = useAuth();
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    const loggedUser = JSON.parse(localStorage.getItem('user'));
-    if (!loggedUser) {
+    if (!user) {
       navigate('/login');
       return;
     }
-    setUser(loggedUser);
-    fetchContacts(loggedUser.id);
     
-    if (location.state?.contact) {
+    // Check if we navigated here with a specific contact to chat with
+    if (location.state && location.state.contact) {
         setSelectedContact(location.state.contact);
     }
-  }, [navigate, location.state]);
+    
+    fetchContacts(user.id);
+  }, [navigate, location.state, user]);
 
   const fetchContacts = async (userId) => {
     try {
@@ -91,13 +93,13 @@ export default function Messages() {
         {/* Sidebar Contacts */}
         <div className="w-1/3 md:w-80 bg-gray-50/50 border-r border-gray-100 flex flex-col h-full shrink-0">
           <div className="p-6 bg-white border-b border-gray-100 shadow-sm z-10 relative">
-            <h3 className="text-2xl font-extrabold text-gray-900 tracking-tight">Messages <span className="text-xl">💬</span></h3>
+            <h3 className="text-2xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">Messages <MessageSquare className="w-6 h-6 text-green-600" /></h3>
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
             {contacts.length === 0 && !selectedContact && (
               <div className="text-center py-10 px-4">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white shadow-sm border border-gray-100 mb-4">
-                  <span className="text-2xl opacity-50">📬</span>
+                  <Mail className="w-8 h-8 text-gray-300" />
                 </div>
                 <p className="text-gray-500 font-medium">No messages yet.</p>
                 <p className="text-sm text-gray-400 mt-1">Start a conversation from the marketplace.</p>
@@ -109,8 +111,12 @@ export default function Messages() {
               <div 
                 className="p-4 rounded-2xl cursor-pointer transition-all bg-green-50 border border-green-100 shadow-sm flex items-center gap-4"
               >
-                <div className="w-12 h-12 bg-white text-green-600 rounded-full flex items-center justify-center text-xl font-bold shadow-sm">
-                  {selectedContact.name.charAt(0).toUpperCase()}
+                <div className="w-12 h-12 bg-white text-green-600 rounded-full flex items-center justify-center text-xl font-bold shadow-sm overflow-hidden shrink-0">
+                  {selectedContact.avatarUrl ? (
+                    <img src={selectedContact.avatarUrl} alt={selectedContact.name} className="w-full h-full object-cover" />
+                  ) : (
+                    selectedContact.name.charAt(0).toUpperCase()
+                  )}
                 </div>
                 <div>
                   <h4 className="font-bold text-gray-900">{selectedContact.name}</h4>
@@ -127,8 +133,12 @@ export default function Messages() {
                   onClick={() => setSelectedContact(c)}
                   className={`p-4 rounded-2xl cursor-pointer transition-all flex items-center gap-4 ${isSelected ? 'bg-green-50 border border-green-100 shadow-sm' : 'bg-white border border-transparent hover:border-gray-200 hover:shadow-sm'}`}
                 >
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold shadow-sm transition-colors ${isSelected ? 'bg-white text-green-600' : 'bg-gray-100 text-gray-500'}`}>
-                    {c.name.charAt(0).toUpperCase()}
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold shadow-sm transition-colors overflow-hidden shrink-0 ${isSelected ? 'bg-white text-green-600' : 'bg-gray-100 text-gray-500'}`}>
+                    {c.avatarUrl ? (
+                      <img src={c.avatarUrl} alt={c.name} className="w-full h-full object-cover" />
+                    ) : (
+                      c.name.charAt(0).toUpperCase()
+                    )}
                   </div>
                   <div>
                     <h4 className={`font-bold transition-colors ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>{c.name}</h4>
@@ -146,12 +156,16 @@ export default function Messages() {
             <>
               {/* Chat Header */}
               <div className="p-6 bg-white border-b border-gray-100 shadow-sm z-10 flex items-center gap-4 sticky top-0">
-                <div className="w-12 h-12 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xl font-bold shadow-inner">
-                  {selectedContact.name.charAt(0).toUpperCase()}
+                <div className="w-12 h-12 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xl font-bold shadow-inner overflow-hidden shrink-0">
+                  {selectedContact.avatarUrl ? (
+                    <img src={selectedContact.avatarUrl} alt={selectedContact.name} className="w-full h-full object-cover" />
+                  ) : (
+                    selectedContact.name.charAt(0).toUpperCase()
+                  )}
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-gray-900 leading-none mb-1">{selectedContact.name}</h3>
-                  <p className="text-sm text-gray-500 flex items-center gap-1"><span className="opacity-60 text-xs">📍</span> {selectedContact.location}</p>
+                  <p className="text-sm text-gray-500 flex items-center gap-1"><MapPin className="w-3 h-3 opacity-60" /> {selectedContact.location}</p>
                 </div>
               </div>
               
@@ -159,7 +173,7 @@ export default function Messages() {
               <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-gray-50/30">
                 {messages.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                    <span className="text-5xl mb-4 opacity-50">👋</span>
+                    <Smile className="w-12 h-12 mb-4 opacity-30" />
                     <p className="font-medium text-lg text-gray-500">Say hello to {selectedContact.name}!</p>
                   </div>
                 ) : (
@@ -171,8 +185,12 @@ export default function Messages() {
                     return (
                       <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
                         {!isMine && showAvatar ? (
-                          <div className="w-8 h-8 bg-gray-200 text-gray-600 rounded-full flex items-center justify-center text-xs font-bold mr-2 mt-auto shrink-0 shadow-sm">
-                            {selectedContact.name.charAt(0).toUpperCase()}
+                          <div className="w-8 h-8 bg-gray-200 text-gray-600 rounded-full flex items-center justify-center text-xs font-bold mr-2 mt-auto shrink-0 shadow-sm overflow-hidden">
+                            {selectedContact.avatarUrl ? (
+                              <img src={selectedContact.avatarUrl} alt={selectedContact.name} className="w-full h-full object-cover" />
+                            ) : (
+                              selectedContact.name.charAt(0).toUpperCase()
+                            )}
                           </div>
                         ) : (
                           !isMine && <div className="w-8 mr-2 shrink-0"></div>
@@ -216,7 +234,7 @@ export default function Messages() {
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-gray-400 bg-gray-50/50">
               <div className="w-24 h-24 bg-white rounded-full shadow-sm border border-gray-100 flex items-center justify-center mb-6">
-                <span className="text-4xl">💬</span>
+                <MessageCircle className="w-10 h-10 text-green-500" />
               </div>
               <h3 className="text-2xl font-bold text-gray-800 mb-2">Your Messages</h3>
               <p className="text-gray-500 font-medium">Select a conversation to start chatting</p>

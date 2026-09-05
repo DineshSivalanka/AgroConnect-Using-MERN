@@ -1,30 +1,41 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { request } from '../api';
 import { Card, CardBody, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { useAuth } from '../context/AuthContext';
+import { Sprout, TrendingUp, Wheat, Inbox, MessageCircle, Edit2, Trash2, Plus, Upload, Image as ImageIcon, CheckCircle } from 'lucide-react';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { storage } from '../firebase';
 
 export default function FarmerDashboard() {
   const navigate = useNavigate();
+  const { dbUser, currentUser } = useAuth();
   const [user, setUser] = useState(null);
   const [products, setProducts] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [marketPrices, setMarketPrices] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newProduct, setNewProduct] = useState({ productName: '', quantity: '', unit: 'KG', expectedPrice: '', location: '', availableDate: '', category: 'Vegetables', imageUrl: '', description: '' });
+  const [newProduct, setNewProduct] = useState({ productName: '', quantity: '', unit: 'KG', expectedPrice: '', location: '', availableDate: '', category: 'Vegetables', imageUrl: '', description: '', quality: '' });
   const [editingProduct, setEditingProduct] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef(null);
+  const editFileInputRef = useRef(null);
 
   useEffect(() => {
-    const loggedUser = JSON.parse(localStorage.getItem('user'));
-    if (!loggedUser || loggedUser.role !== 'FARMER') {
-      navigate('/login');
-      return;
+    if (dbUser) {
+      if (dbUser.role !== 'FARMER') {
+        navigate('/login');
+      } else {
+        setUser(dbUser);
+        fetchData(dbUser.id);
+      }
     }
-    setUser(loggedUser);
-    fetchData(loggedUser.id);
-  }, [navigate]);
+  }, [dbUser, navigate]);
 
   const fetchData = async (farmerId) => {
     try {
@@ -32,6 +43,8 @@ export default function FarmerDashboard() {
       setProducts(prods || []);
       const reqs = await request(`/requests/farmer/${farmerId}`);
       setRequests((reqs || []).filter(r => r.status !== 'ACCEPTED'));
+      const prices = await request('/market-prices?limit=5');
+      setMarketPrices(prices || []);
     } catch (e) {
       console.error(e);
     }
@@ -63,6 +76,48 @@ export default function FarmerDashboard() {
     }
   };
 
+  const handleImageUpload = async (e, isEdit = false) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      const storageRef = ref(storage, `products/${user.id}_${Date.now()}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
+        },
+        (error) => {
+          alert('Failed to upload image: ' + error.message);
+          setIsUploading(false);
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          if (isEdit) {
+            setEditingProduct(prev => ({...prev, imageUrl: downloadURL}));
+          } else {
+            setNewProduct(prev => ({...prev, imageUrl: downloadURL}));
+          }
+          setIsUploading(false);
+          setUploadProgress(0);
+        }
+      );
+    } catch (err) {
+      alert('Failed to start upload: ' + err.message);
+      setIsUploading(false);
+    }
+  };
+
   const handleDeleteProduct = async (id) => {
     if (!window.confirm("Are you sure you want to delete this product?")) return;
     try {
@@ -71,6 +126,19 @@ export default function FarmerDashboard() {
     } catch (e) {
       console.error(e);
       alert('Failed to delete product: ' + e.message);
+    }
+  };
+
+  const handleMarkAsSold = async (id) => {
+    try {
+      await request(`/listings/${id}`, { 
+        method: 'PUT',
+        body: JSON.stringify({ status: 'SOLD' })
+      });
+      fetchData(user.id);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to update product status: ' + e.message);
     }
   };
 
@@ -120,24 +188,69 @@ export default function FarmerDashboard() {
     <div className="space-y-8 animate-fadeIn">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">Welcome, {user.name} <span className="text-2xl">👨‍🌾</span></h2>
+          <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            Welcome, {user.name} 
+            <Sprout className="w-8 h-8 text-green-600" />
+          </h2>
           <p className="text-gray-500 mt-1">Manage your agricultural produce and buyer requests</p>
         </div>
         <Button onClick={() => {
            setNewProduct({...newProduct, location: user.location});
            setShowAddModal(true);
-        }}>
-          + Add Product
+        }} className="flex items-center gap-2">
+          <Plus className="w-5 h-5" /> Add Product
         </Button>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        
+        {/* Market Prices Widget */}
+        <div className="xl:col-span-2">
+          <Card>
+            <CardBody>
+              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <TrendingUp className="w-6 h-6 text-green-600" /> Current Market Prices (Mandi Rates)
+              </h3>
+              {marketPrices.length === 0 ? (
+                <p className="text-gray-500 text-sm">No market price data available currently.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-600 text-sm border-b border-gray-100">
+                        <th className="p-3 font-semibold rounded-tl-xl">Crop</th>
+                        <th className="p-3 font-semibold">Market</th>
+                        <th className="p-3 font-semibold">Location</th>
+                        <th className="p-3 font-semibold text-right">Min Price</th>
+                        <th className="p-3 font-semibold text-right">Max Price</th>
+                        <th className="p-3 font-semibold text-right rounded-tr-xl">Modal Price</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {marketPrices.map((price, idx) => (
+                        <tr key={idx} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                          <td className="p-3 font-bold text-gray-900">{price.cropName}</td>
+                          <td className="p-3 text-gray-700">{price.marketName}</td>
+                          <td className="p-3 text-gray-500 text-sm">{price.district}, {price.state}</td>
+                          <td className="p-3 text-right text-gray-600">₹{price.minPrice}/Qtl</td>
+                          <td className="p-3 text-right text-gray-600">₹{price.maxPrice}/Qtl</td>
+                          <td className="p-3 text-right text-green-700 font-bold">₹{price.modalPrice}/Qtl</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        </div>
+
         <Card>
           <CardBody>
             <h3 className="text-2xl font-bold text-gray-900 mb-6">My Products</h3>
             {products.length === 0 ? (
               <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                <span className="text-4xl mb-3 block">🌾</span>
+                <Wheat className="w-12 h-12 mx-auto text-green-300 mb-3 block" />
                 <p className="text-gray-500 font-medium">No products added yet.</p>
               </div>
             ) : (
@@ -167,8 +280,11 @@ export default function FarmerDashboard() {
                       </div>
                     </div>
                     <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="secondary" size="sm" onClick={() => { setEditingProduct(p); setShowEditModal(true); }} className="flex-1 sm:flex-none">Edit</Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDeleteProduct(p.id)} className="flex-1 sm:flex-none text-red-600 hover:bg-red-50 hover:text-red-700">Delete</Button>
+                      {p.status === 'AVAILABLE' && (
+                        <Button variant="outline" size="sm" onClick={() => handleMarkAsSold(p.id)} className="flex-1 sm:flex-none flex items-center gap-1.5 text-green-600 border-green-200 hover:bg-green-50"><CheckCircle className="w-4 h-4"/> Mark Sold</Button>
+                      )}
+                      <Button variant="secondary" size="sm" onClick={() => { setEditingProduct(p); setShowEditModal(true); }} className="flex-1 sm:flex-none flex items-center gap-1.5"><Edit2 className="w-4 h-4"/> Edit</Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteProduct(p.id)} className="flex-1 sm:flex-none text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center gap-1.5"><Trash2 className="w-4 h-4"/> Delete</Button>
                     </div>
                   </div>
                 ))}
@@ -182,7 +298,7 @@ export default function FarmerDashboard() {
             <h3 className="text-2xl font-bold text-gray-900 mb-6">Buyer Requests</h3>
             {requests.length === 0 ? (
               <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                <span className="text-4xl mb-3 block">📫</span>
+                <Inbox className="w-12 h-12 mx-auto text-blue-300 mb-3 block" />
                 <p className="text-gray-500 font-medium">No requests yet.</p>
               </div>
             ) : (
@@ -214,7 +330,7 @@ export default function FarmerDashboard() {
                           onClick={() => navigate('/messages', { state: { contact: r.buyer } })}
                           className="flex items-center gap-1.5"
                         >
-                          <span>💬</span> Message
+                          <MessageCircle className="w-4 h-4" /> Message
                         </Button>
                       </div>
                     </div>
@@ -286,13 +402,48 @@ export default function FarmerDashboard() {
                   </select>
                 </div>
               </div>
-              <Input
-                label="Image URL (Optional)"
-                id="imageUrl"
-                placeholder="https://..."
-                value={newProduct.imageUrl}
-                onChange={e => setNewProduct({...newProduct, imageUrl: e.target.value})}
-              />
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Product Image (Optional)</label>
+                <div className="flex items-center gap-4">
+                  <div 
+                    className="w-20 h-20 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center cursor-pointer hover:border-green-500 transition-colors relative overflow-hidden"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {newProduct.imageUrl ? (
+                      <img src={newProduct.imageUrl} alt="Product" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon className="w-8 h-8 text-gray-400" />
+                    )}
+                    {isUploading && (
+                      <div className="absolute inset-0 bg-white/70 flex flex-col justify-center items-center">
+                        <span className="text-xs font-bold text-green-700">{Math.round(uploadProgress)}%</span>
+                        <div className="absolute bottom-0 left-0 h-1 bg-green-500 transition-all" style={{ width: `${uploadProgress}%` }}></div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <Button 
+                      type="button" 
+                      variant="secondary" 
+                      size="sm" 
+                      onClick={() => fileInputRef.current?.click()} 
+                      disabled={isUploading}
+                      className="flex items-center gap-2"
+                    >
+                      <Upload className="w-4 h-4" /> Upload Photo
+                    </Button>
+                    <p className="text-xs text-gray-500 mt-1">Or paste an image URL below:</p>
+                    <input 
+                      type="text" 
+                      placeholder="https://..." 
+                      className="mt-1 w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                      value={newProduct.imageUrl}
+                      onChange={e => setNewProduct({...newProduct, imageUrl: e.target.value})}
+                    />
+                  </div>
+                  <input type="file" ref={fileInputRef} onChange={(e) => handleImageUpload(e, false)} accept="image/*" className="hidden" />
+                </div>
+              </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">Description</label>
                 <textarea className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none" rows="2" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})}></textarea>
@@ -370,12 +521,47 @@ export default function FarmerDashboard() {
                   </select>
                 </div>
               </div>
-              <Input
-                label="Image URL (Optional)"
-                id="editImageUrl"
-                value={editingProduct.imageUrl || ''}
-                onChange={e => setEditingProduct({...editingProduct, imageUrl: e.target.value})}
-              />
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Product Image (Optional)</label>
+                <div className="flex items-center gap-4">
+                  <div 
+                    className="w-20 h-20 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center cursor-pointer hover:border-green-500 transition-colors relative overflow-hidden"
+                    onClick={() => editFileInputRef.current?.click()}
+                  >
+                    {editingProduct.imageUrl ? (
+                      <img src={editingProduct.imageUrl} alt="Product" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon className="w-8 h-8 text-gray-400" />
+                    )}
+                    {isUploading && (
+                      <div className="absolute inset-0 bg-white/70 flex flex-col justify-center items-center">
+                        <span className="text-xs font-bold text-green-700">{Math.round(uploadProgress)}%</span>
+                        <div className="absolute bottom-0 left-0 h-1 bg-green-500 transition-all" style={{ width: `${uploadProgress}%` }}></div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <Button 
+                      type="button" 
+                      variant="secondary" 
+                      size="sm" 
+                      onClick={() => editFileInputRef.current?.click()} 
+                      disabled={isUploading}
+                      className="flex items-center gap-2"
+                    >
+                      <Upload className="w-4 h-4" /> Upload Photo
+                    </Button>
+                    <p className="text-xs text-gray-500 mt-1">Or paste an image URL below:</p>
+                    <input 
+                      type="text" 
+                      className="mt-1 w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                      value={editingProduct.imageUrl || ''}
+                      onChange={e => setEditingProduct({...editingProduct, imageUrl: e.target.value})}
+                    />
+                  </div>
+                  <input type="file" ref={editFileInputRef} onChange={(e) => handleImageUpload(e, true)} accept="image/*" className="hidden" />
+                </div>
+              </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">Description</label>
                 <textarea className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none" rows="2" value={editingProduct.description || ''} onChange={e => setEditingProduct({...editingProduct, description: e.target.value})}></textarea>

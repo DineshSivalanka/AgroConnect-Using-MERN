@@ -37,6 +37,10 @@ const productOrderSchema = new mongoose.Schema({
     type: String,
     enum: ['PLACED', 'PAID', 'DELIVERED'],
     default: 'PLACED'
+  },
+  deliveryOtp: {
+    type: String,
+    required: false
   }
 }, {
   timestamps: true,

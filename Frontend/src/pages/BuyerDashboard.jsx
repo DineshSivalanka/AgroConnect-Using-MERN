@@ -4,9 +4,12 @@ import { request } from '../api';
 import { Card, CardBody, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { useAuth } from '../context/AuthContext';
+import { ShoppingCart, Search, Store, Sprout, Star, MapPin, MessageCircle, FileText, Package, IndianRupee, SlidersHorizontal } from 'lucide-react';
 
 export default function BuyerDashboard() {
   const navigate = useNavigate();
+  const { dbUser } = useAuth();
   const [user, setUser] = useState(null);
   const [products, setProducts] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -16,26 +19,64 @@ export default function BuyerDashboard() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [newRequest, setNewRequest] = useState({ quantity: '', offeredPrice: '', message: '', requestType: 'IMMEDIATE', advancePaymentAmount: '' });
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    const loggedUser = JSON.parse(localStorage.getItem('user'));
-    if (!loggedUser || loggedUser.role !== 'BUYER') {
-      navigate('/login');
-      return;
+    if (dbUser) {
+      if (dbUser.role !== 'BUYER') {
+        navigate('/login');
+      } else {
+        setUser(dbUser);
+        fetchRequests(dbUser.id);
+      }
     }
-    setUser(loggedUser);
-    fetchData(loggedUser.id);
-  }, [navigate]);
+  }, [dbUser, navigate]);
 
-  const fetchData = async (buyerId) => {
+  useEffect(() => {
+    if (user) {
+      // Debounce the fetch slightly to avoid spamming the server on every keystroke
+      const timer = setTimeout(() => {
+        fetchProducts();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [user, searchTerm, filterCategory, page, minPrice, maxPrice, locationFilter]);
+
+  const fetchProducts = async () => {
     try {
-      const prods = await request('/listings');
-      setProducts(prods || []);
+      let url = `/listings?page=${page}&limit=10`;
+      if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+      if (filterCategory !== 'All') url += `&category=${encodeURIComponent(filterCategory)}`;
+      if (minPrice) url += `&minPrice=${minPrice}`;
+      if (maxPrice) url += `&maxPrice=${maxPrice}`;
+      if (locationFilter) url += `&location=${encodeURIComponent(locationFilter)}`;
+      
+      const response = await request(url);
+      setProducts(response.listings || []);
+      setTotalPages(response.totalPages || 1);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchRequests = async (buyerId) => {
+    try {
       const reqs = await request(`/requests/buyer/${buyerId}`);
       setRequests((reqs || []).filter(r => r.status !== 'ACCEPTED'));
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const fetchData = (buyerId) => {
+    fetchProducts();
+    fetchRequests(buyerId);
   };
 
   const handleSendRequest = async (e) => {
@@ -65,11 +106,8 @@ export default function BuyerDashboard() {
     }
   };
 
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.productName && p.productName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = filterCategory === 'All' || p.category === filterCategory;
-    return matchesSearch && matchesCategory && p.status === 'AVAILABLE';
-  });
+  // Products are already filtered from the server
+  const filteredProducts = products;
 
   if (!user) return null;
 
@@ -77,7 +115,10 @@ export default function BuyerDashboard() {
     <div className="space-y-8 animate-fadeIn">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">Welcome, {user.name} <span className="text-2xl">🛒</span></h2>
+          <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            Welcome, {user.name} 
+            <ShoppingCart className="w-8 h-8 text-blue-600" />
+          </h2>
           <p className="text-gray-500 mt-1">Browse the marketplace and manage your purchase requests</p>
         </div>
       </div>
@@ -91,7 +132,7 @@ export default function BuyerDashboard() {
               <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                 <h3 className="text-2xl font-bold text-gray-900">Marketplace</h3>
                 <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-                  <select className="border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 font-medium text-gray-700" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+                  <select className="border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 font-medium text-gray-700" value={filterCategory} onChange={(e) => { setFilterCategory(e.target.value); setPage(1); }}>
                     <option value="All">All Categories</option>
                     <option value="Vegetables">Vegetables</option>
                     <option value="Fruits">Fruits</option>
@@ -105,16 +146,59 @@ export default function BuyerDashboard() {
                       placeholder="Search products..." 
                       className="pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 w-full sm:w-64 transition-all"
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
                     />
-                    <span className="absolute left-4 top-2.5 opacity-50">🔍</span>
+                    <Search className="absolute left-4 top-2.5 opacity-50 w-5 h-5 text-gray-500" />
                   </div>
+                  <Button 
+                    variant={showFilters ? 'primary' : 'outline'}
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="flex items-center gap-2"
+                  >
+                    <SlidersHorizontal className="w-5 h-5" /> Filters
+                  </Button>
                 </div>
               </div>
 
+              {/* Advanced Filters Panel */}
+              {showFilters && (
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 mb-6 animate-fadeIn grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Min Price (₹)</label>
+                    <input 
+                      type="number" 
+                      placeholder="e.g. 100" 
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={minPrice}
+                      onChange={(e) => { setMinPrice(e.target.value); setPage(1); }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Max Price (₹)</label>
+                    <input 
+                      type="number" 
+                      placeholder="e.g. 5000" 
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={maxPrice}
+                      onChange={(e) => { setMaxPrice(e.target.value); setPage(1); }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Location</label>
+                    <input 
+                      type="text" 
+                      placeholder="City or District..." 
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={locationFilter}
+                      onChange={(e) => { setLocationFilter(e.target.value); setPage(1); }}
+                    />
+                  </div>
+                </div>
+              )}
+
               {filteredProducts.length === 0 ? (
                 <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                  <span className="text-4xl mb-3 block">🏪</span>
+                  <Store className="w-12 h-12 mx-auto text-blue-300 mb-3 block" />
                   <p className="text-gray-500 font-medium">No products available in the market.</p>
                 </div>
               ) : (
@@ -135,13 +219,13 @@ export default function BuyerDashboard() {
                         
                         <div className="bg-gray-50 p-3 rounded-xl mb-4 space-y-2">
                           <p className="text-gray-700 text-sm flex items-center gap-2">
-                            <span className="opacity-60">👨‍🌾</span> <span className="font-semibold">{p.farmer?.name}</span>
+                            <Sprout className="w-4 h-4 opacity-60" /> <span className="font-semibold">{p.farmer?.name}</span>
                             {p.farmer?.reviewCount > 0 && (
-                              <span className="text-amber-500 font-bold ml-auto text-xs">⭐ {p.farmer.averageRating}</span>
+                              <span className="text-amber-500 font-bold ml-auto text-xs flex items-center gap-1"><Star className="w-3 h-3 fill-amber-500" /> {p.farmer.averageRating}</span>
                             )}
                           </p>
                           <p className="text-gray-700 text-sm flex items-center gap-2">
-                            <span className="opacity-60">📍</span> {p.location}
+                            <MapPin className="w-4 h-4 opacity-60" /> {p.location}
                           </p>
                         </div>
 
@@ -165,7 +249,7 @@ export default function BuyerDashboard() {
                           className="flex-[1]"
                           onClick={() => { navigate('/messages', { state: { contact: p.farmer } }); }}
                         >
-                          💬
+                          <MessageCircle className="w-5 h-5 mx-auto" />
                         </Button>
                         <Button 
                           className="flex-[3]"
@@ -188,6 +272,29 @@ export default function BuyerDashboard() {
                   ))}
                 </div>
               )}
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-4 mt-8 pt-6 border-t border-gray-100">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setPage(p => Math.max(1, p - 1))} 
+                    disabled={page === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm font-semibold text-gray-700">
+                    Page {page} of {totalPages}
+                  </span>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
+                    disabled={page === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
             </CardBody>
           </Card>
         </div>
@@ -199,7 +306,7 @@ export default function BuyerDashboard() {
               <h3 className="text-2xl font-bold text-gray-900 mb-6">My Requests</h3>
               {requests.length === 0 ? (
                 <div className="text-center py-8 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                  <span className="text-3xl mb-2 block">📝</span>
+                  <FileText className="w-10 h-10 mx-auto text-blue-300 mb-2 block" />
                   <p className="text-gray-500 font-medium text-sm">You haven't sent any requests yet.</p>
                 </div>
               ) : (
@@ -214,12 +321,12 @@ export default function BuyerDashboard() {
                       </div>
                       
                       <div className="space-y-1.5 mb-3">
-                        <p className="text-sm text-gray-600 flex items-center gap-2"><span className="opacity-50">👨‍🌾</span> {r.listing?.farmer?.name}</p>
+                        <p className="text-sm text-gray-600 flex items-center gap-2"><Sprout className="w-4 h-4 opacity-50" /> {r.listing?.farmer?.name}</p>
                         <p className="text-sm text-gray-600 flex items-center gap-2">
-                          <span className="opacity-50">📦</span> {r.quantity} {r.listing?.unit}
+                          <Package className="w-4 h-4 opacity-50" /> {r.quantity} {r.listing?.unit}
                         </p>
                         <p className="text-sm font-semibold text-green-700 flex items-center gap-2">
-                          <span className="opacity-50">💰</span> ₹{r.offeredPrice}/{r.listing?.unit}
+                          <IndianRupee className="w-4 h-4 opacity-50" /> ₹{r.offeredPrice}/{r.listing?.unit}
                         </p>
                       </div>
 

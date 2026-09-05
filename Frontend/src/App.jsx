@@ -11,6 +11,7 @@ import Orders from './pages/Orders';
 import { AuthProvider } from './context/AuthContext';
 import MainLayout from './layouts/MainLayout';
 import DashboardLayout from './layouts/DashboardLayout';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
@@ -25,12 +26,24 @@ function App() {
             
             {/* Dashboard Layout routes (nav, footer, AND sidebar) */}
             <Route element={<DashboardLayout />}>
-              <Route path="/farmer-dashboard" element={<FarmerDashboard />} />
-              <Route path="/buyer-dashboard" element={<BuyerDashboard />} />
-              <Route path="/admin-dashboard" element={<AdminDashboard />} />
-              <Route path="/messages" element={<Messages />} />
-              <Route path="/orders" element={<Orders />} />
-              <Route path="/profile" element={<Profile />} />
+              <Route element={<ProtectedRoute allowedRoles={['FARMER']} />}>
+                <Route path="/farmer-dashboard" element={<FarmerDashboard />} />
+              </Route>
+              
+              <Route element={<ProtectedRoute allowedRoles={['BUYER']} />}>
+                <Route path="/buyer-dashboard" element={<BuyerDashboard />} />
+              </Route>
+              
+              <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+                <Route path="/admin-dashboard" element={<AdminDashboard />} />
+              </Route>
+              
+              {/* Routes accessible to both FARMER and BUYER */}
+              <Route element={<ProtectedRoute allowedRoles={['FARMER', 'BUYER']} />}>
+                <Route path="/messages" element={<Messages />} />
+                <Route path="/orders" element={<Orders />} />
+                <Route path="/profile" element={<Profile />} />
+              </Route>
             </Route>
           </Route>
         </Routes>

@@ -13,6 +13,10 @@ const productListingSchema = new mongoose.Schema({
     type: String,
     required: false
   },
+  quality: {
+    type: String,
+    required: false
+  },
   expectedPrice: {
     type: Number,
     required: false

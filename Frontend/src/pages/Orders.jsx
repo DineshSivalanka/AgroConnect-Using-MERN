@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { request } from '../api';
 import { Card, CardBody } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { useAuth } from '../context/AuthContext';
+import { ShoppingCart, Sprout, Package, User, MapPin, Star, MessageCircle, FileText } from 'lucide-react';
+import { generateInvoice } from '../utils/pdfGenerator';
 
 export default function Orders() {
   const navigate = useNavigate();
@@ -17,16 +20,22 @@ export default function Orders() {
   const [reviewComment, setReviewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  
+  // OTP Modal State
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [selectedOrderForOtp, setSelectedOrderForOtp] = useState(null);
+  const [otpInput, setOtpInput] = useState('');
+
+  const { dbUser } = useAuth();
 
   useEffect(() => {
-    const loggedUser = JSON.parse(localStorage.getItem('user'));
-    if (!loggedUser) {
+    if (dbUser) {
+      setUser(dbUser);
+      fetchOrders(dbUser.id);
+    } else {
       navigate('/login');
-      return;
     }
-    setUser(loggedUser);
-    fetchOrders(loggedUser.id);
-  }, [navigate]);
+  }, [dbUser, navigate]);
 
   const fetchOrders = async (userId) => {
     try {
@@ -40,19 +49,39 @@ export default function Orders() {
     }
   };
 
-  const handleUpdateStatus = async (orderId, newStatus) => {
+  const handleUpdateStatus = async (orderId, newStatus, otp = null) => {
     setIsUpdatingStatus(true);
     try {
+      const payload = { status: newStatus };
+      if (otp) payload.otp = otp;
+      
       await request(`/orders/${orderId}/status`, {
         method: 'PUT',
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify(payload)
       });
+      
+      if (newStatus === 'DELIVERED') {
+        alert('Order marked as Delivered successfully!');
+        setOtpModalOpen(false);
+        setSelectedOrderForOtp(null);
+        setOtpInput('');
+      }
+      
       fetchOrders(user.id);
     } catch (e) {
-      alert('Failed to update order status');
+      alert(e.message || 'Failed to update order status');
     } finally {
       setIsUpdatingStatus(false);
     }
+  };
+
+  const handleVerifyDelivery = (e) => {
+    e.preventDefault();
+    if (!otpInput || otpInput.trim().length !== 6) {
+      alert('Please enter a valid 6-digit OTP.');
+      return;
+    }
+    handleUpdateStatus(selectedOrderForOtp.id, 'DELIVERED', otpInput.trim());
   };
 
   const handleSubmitReview = async () => {
@@ -88,7 +117,8 @@ export default function Orders() {
       <div className="bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight flex items-center gap-3">
-            {isBuyer ? 'My Purchases' : 'My Sales'} <span className="text-2xl">{isBuyer ? '🛒' : '👨‍🌾'}</span>
+            {isBuyer ? 'My Purchases' : 'My Sales'} 
+            {isBuyer ? <ShoppingCart className="w-8 h-8 text-blue-600" /> : <Sprout className="w-8 h-8 text-green-600" />}
           </h2>
           <p className="text-gray-500 mt-2 font-medium">
             {isBuyer 
@@ -107,7 +137,7 @@ export default function Orders() {
             </div>
           ) : orders.length === 0 ? (
             <div className="text-center py-20 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 m-4 sm:m-0">
-              <span className="text-5xl mb-4 block">📦</span>
+              <Package className="w-16 h-16 mx-auto mb-4 text-gray-300 block" />
               <p className="text-gray-500 font-medium text-lg">No orders found.</p>
               <p className="text-gray-400 mt-2">When you {isBuyer ? 'buy' : 'sell'} items, they will appear here.</p>
             </div>
@@ -124,7 +154,9 @@ export default function Orders() {
                       {order.listing?.imageUrl ? (
                         <img src={order.listing.imageUrl} alt={order.listing.productName} className="w-32 h-32 object-cover rounded-xl shadow-md border-2 border-white mb-4 z-10 group-hover:scale-105 transition-transform duration-300" />
                       ) : (
-                        <div className="w-32 h-32 bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center text-5xl mb-4 z-10 group-hover:scale-105 transition-transform duration-300">📦</div>
+                        <div className="w-32 h-32 bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center mb-4 z-10 group-hover:scale-105 transition-transform duration-300">
+                          <Package className="w-12 h-12 text-gray-300" />
+                        </div>
                       )}
                       <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest z-10 shadow-sm
                         ${order.status === 'PLACED' ? 'bg-amber-100 text-amber-700' : 
@@ -153,8 +185,8 @@ export default function Orders() {
                           <p className="text-xs text-gray-400 font-bold mb-3 uppercase tracking-wider">{isBuyer ? 'Seller Information' : 'Buyer Information'}</p>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-lg shadow-sm border border-gray-100">
-                                👤
+                              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100">
+                                <User className="w-5 h-5 text-gray-400" />
                               </div>
                               <div>
                                 <p className="font-bold text-gray-900">{otherParty?.name}</p>
@@ -162,8 +194,8 @@ export default function Orders() {
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-lg shadow-sm border border-gray-100">
-                                📍
+                              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100">
+                                <MapPin className="w-5 h-5 text-gray-400" />
                               </div>
                               <div>
                                 <p className="font-bold text-gray-900">Location</p>
@@ -172,6 +204,18 @@ export default function Orders() {
                             </div>
                           </div>
                         </div>
+                        
+                        {isBuyer && order.status !== 'DELIVERED' && order.deliveryOtp && (
+                          <div className="mt-4 bg-amber-50 rounded-xl p-4 border border-amber-200 shadow-inner flex items-center justify-between">
+                            <div>
+                              <p className="text-xs text-amber-700 font-bold uppercase tracking-wider mb-1">Delivery OTP</p>
+                              <p className="text-sm text-amber-800 font-medium">Share this code with the farmer upon delivery.</p>
+                            </div>
+                            <div className="bg-white px-4 py-2 rounded-lg border border-amber-200 shadow-sm">
+                              <span className="text-2xl font-black text-amber-600 tracking-widest">{order.deliveryOtp}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       
                       <div className="mt-8 flex flex-col sm:flex-row justify-end items-center gap-3">
@@ -183,18 +227,28 @@ export default function Orders() {
                               setRating(5);
                               setReviewModalOpen(true);
                             }}
-                            className="w-full sm:w-auto border-amber-200 text-amber-700 hover:bg-amber-50"
+                            className="w-full sm:w-auto border-amber-200 text-amber-700 hover:bg-amber-50 flex items-center justify-center gap-1.5"
                           >
-                            ⭐ Rate Experience
+                            <Star className="w-4 h-4 fill-amber-500 text-amber-500" /> Rate Experience
                           </Button>
                         )}
                         <Button 
                           variant="secondary"
                           onClick={() => navigate('/messages', { state: { contact: otherParty } })}
-                          className="w-full sm:w-auto"
+                          className="w-full sm:w-auto flex items-center justify-center gap-1.5"
                         >
-                          💬 Message
+                          <MessageCircle className="w-4 h-4" /> Message
                         </Button>
+                        
+                        {(order.status === 'PAID' || order.status === 'DELIVERED') && (
+                          <Button 
+                            variant="outline"
+                            onClick={() => generateInvoice(order, user)}
+                            className="w-full sm:w-auto flex items-center justify-center gap-1.5 border-green-200 text-green-700 hover:bg-green-50"
+                          >
+                            <FileText className="w-4 h-4" /> Invoice
+                          </Button>
+                        )}
                         
                         {/* Status update buttons - Farmers can mark as Paid/Delivered */}
                         {!isBuyer && order.status === 'PLACED' && (
@@ -208,7 +262,10 @@ export default function Orders() {
                         )}
                         {!isBuyer && order.status === 'PAID' && (
                           <Button 
-                            onClick={() => handleUpdateStatus(order.id, 'DELIVERED')} 
+                            onClick={() => {
+                              setSelectedOrderForOtp(order);
+                              setOtpModalOpen(true);
+                            }} 
                             className="w-full sm:w-auto"
                             isLoading={isUpdatingStatus}
                           >
@@ -239,9 +296,9 @@ export default function Orders() {
                 <button 
                   key={star} 
                   onClick={() => setRating(star)}
-                  className={`text-5xl focus:outline-none transition-all hover:scale-110 active:scale-95 ${star <= rating ? 'text-amber-400 drop-shadow-sm' : 'text-gray-200 grayscale opacity-50'}`}
+                  className={`focus:outline-none transition-all hover:scale-110 active:scale-95 ${star <= rating ? 'text-amber-400 drop-shadow-sm' : 'text-gray-200 grayscale opacity-50'}`}
                 >
-                  ★
+                  <Star className="w-10 h-10 fill-current" />
                 </button>
               ))}
             </div>
@@ -273,6 +330,52 @@ export default function Orders() {
                 Submit Review
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* OTP Verification Modal */}
+      {otpModalOpen && (
+        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-8 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-green-500"></div>
+            
+            <h3 className="text-2xl font-extrabold text-gray-900 mb-2">Verify Delivery</h3>
+            <p className="text-gray-500 mb-6 font-medium">Ask the buyer (<span className="text-gray-900 font-bold">{selectedOrderForOtp?.buyer?.name}</span>) for their 6-digit delivery OTP to confirm they received the items.</p>
+            
+            <form onSubmit={handleVerifyDelivery}>
+              <div className="mb-8">
+                <input 
+                  type="text"
+                  maxLength={6}
+                  value={otpInput}
+                  onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))} // Only allow digits
+                  className="w-full px-5 py-4 rounded-2xl bg-gray-50 border border-gray-200 focus:border-green-400 focus:ring-2 focus:ring-green-200/50 outline-none transition-all text-center text-3xl font-black tracking-[0.5em] text-gray-800"
+                  placeholder="••••••"
+                />
+              </div>
+              
+              <div className="flex gap-4">
+                <Button 
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setOtpModalOpen(false);
+                    setOtpInput('');
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit"
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  isLoading={isUpdatingStatus}
+                >
+                  Confirm
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

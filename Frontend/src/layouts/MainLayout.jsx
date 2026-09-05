@@ -6,7 +6,7 @@ export function Navigation() {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser, logout } = useAuth();
-  const user = JSON.parse(localStorage.getItem('user'));
+  const { dbUser: user } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const handleLogout = async () => {

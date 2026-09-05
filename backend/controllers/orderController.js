@@ -24,6 +24,7 @@ export const getOrdersByUser = async (req, res) => {
       .populate('buyer', 'name phone location')
       .populate('farmer', 'name phone location')
       .populate('listing', 'productName expectedPrice unit imageUrl')
+      .select('+deliveryOtp') // Ensure we fetch it if we need it
       .sort('-createdAt');
     res.status(200).json(orders);
   } catch (error) {
@@ -45,9 +46,25 @@ export const createOrder = async (req, res) => {
 // Update order status
 export const updateOrderStatus = async (req, res) => {
   try {
-    const order = await ProductOrder.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
-    if (!order) return res.status(404).json({ message: 'Order not found' });
-    res.status(200).json(order);
+    const { status, otp } = req.body;
+    
+    // Find the order first to check OTP
+    const orderToUpdate = await ProductOrder.findById(req.params.id);
+    if (!orderToUpdate) return res.status(404).json({ message: 'Order not found' });
+
+    if (status === 'DELIVERED') {
+      if (!otp) {
+        return res.status(400).json({ message: 'OTP is required to mark as delivered.' });
+      }
+      if (orderToUpdate.deliveryOtp && orderToUpdate.deliveryOtp !== otp) {
+        return res.status(400).json({ message: 'Invalid OTP provided.' });
+      }
+    }
+
+    orderToUpdate.status = status;
+    await orderToUpdate.save();
+    
+    res.status(200).json(orderToUpdate);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

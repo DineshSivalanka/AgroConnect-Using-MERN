@@ -8,7 +8,7 @@ const verifyIdToken = async (idToken) => {
   if (!admin.apps.length) throw new Error("Firebase Admin not initialized on the server");
   
   const decodedToken = await admin.auth().verifyIdToken(idToken);
-  return decodedToken.phone_number;
+  return decodedToken;
 };
 
 // Get all users
@@ -27,27 +27,35 @@ export const createUser = async (req, res) => {
     const { idToken, name, role, location } = req.body;
     
     // 1. Verify token with Firebase
-    let phone;
+    let decodedToken;
     try {
-      phone = await verifyIdToken(idToken);
+      decodedToken = await verifyIdToken(idToken);
     } catch (err) {
       return res.status(401).json({ message: 'Invalid or expired authentication token', error: err.message });
     }
+
+    const phone = decodedToken.phone_number;
+    const uid = decodedToken.uid;
 
     if (!phone) {
       return res.status(400).json({ message: 'Phone number not found in token' });
     }
 
     // 2. Check if user already exists
-    let user = await User.findOne({ phone });
+    let user = await User.findOne({ firebaseUid: uid });
+    if (!user) {
+      user = await User.findOne({ phone });
+    }
+    
     if (user) {
-      return res.status(400).json({ message: 'User already exists with this phone number' });
+      return res.status(400).json({ message: 'User already exists' });
     }
 
     // 3. Create user
     user = new User({ 
       name, 
       phone, 
+      firebaseUid: uid,
       role, 
       location,
       isVerified: true // Automatically verified since they used OTP
@@ -66,19 +74,17 @@ export const loginUser = async (req, res) => {
     const { idToken, role } = req.body;
     
     // 1. Verify token with Firebase
-    let phone;
+    let decodedToken;
     try {
-      phone = await verifyIdToken(idToken);
+      decodedToken = await verifyIdToken(idToken);
     } catch (err) {
       return res.status(401).json({ message: 'Invalid or expired authentication token', error: err.message });
     }
 
-    if (!phone) {
-      return res.status(400).json({ message: 'Phone number not found in token' });
-    }
+    const uid = decodedToken.uid;
 
     // 2. Find user in our database
-    const user = await User.findOne({ phone, role });
+    const user = await User.findOne({ firebaseUid: uid, role });
     if (!user) {
       return res.status(401).json({ message: 'User not found or incorrect role selected' });
     }
@@ -123,6 +129,18 @@ export const verifyUser = async (req, res) => {
     const user = await User.findByIdAndUpdate(req.params.id, { isVerified: true }, { new: true });
     if (!user) return res.status(404).json({ message: 'User not found' });
     res.status(200).json(user);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get current user (me)
+export const getCurrentUser = async (req, res) => {
+  try {
+    if (!req.dbUser) {
+      return res.status(404).json({ message: 'User not found in database' });
+    }
+    res.status(200).json(req.dbUser);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

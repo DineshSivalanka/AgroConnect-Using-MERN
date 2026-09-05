@@ -61,6 +61,7 @@ export const updatePurchaseRequestStatus = async (req, res) => {
     
     // Automatically create a ProductOrder when a request is accepted
     if (status === 'ACCEPTED') {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const order = new ProductOrder({
         purchaseRequest: request._id,
         buyer: request.buyer,
@@ -69,7 +70,8 @@ export const updatePurchaseRequestStatus = async (req, res) => {
         quantity: request.quantity,
         agreedPrice: request.offeredPrice,
         totalAmount: request.quantity * request.offeredPrice,
-        status: 'PLACED'
+        status: 'PLACED',
+        deliveryOtp: otp
       });
       await order.save();
     }

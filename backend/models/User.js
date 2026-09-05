@@ -10,6 +10,11 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
+  firebaseUid: {
+    type: String,
+    required: true,
+    unique: true
+  },
   role: {
     type: String,
     enum: ['FARMER', 'BUYER', 'ADMIN'],
@@ -30,6 +35,10 @@ const userSchema = new mongoose.Schema({
   isVerified: {
     type: Boolean,
     default: false
+  },
+  avatarUrl: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true,
