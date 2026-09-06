@@ -41,6 +41,15 @@ export const createUser = async (req, res) => {
       return res.status(400).json({ message: 'Phone number not found in token' });
     }
 
+    // Enforce Admin Access
+    const ADMIN_PHONE = '+919542643859';
+    let finalRole = role;
+    if (phone === ADMIN_PHONE) {
+      finalRole = 'ADMIN';
+    } else if (role === 'ADMIN') {
+      return res.status(403).json({ message: 'Forbidden: Only the designated phone number can be an Admin' });
+    }
+
     // 2. Check if user already exists
     let user = await User.findOne({ firebaseUid: uid });
     if (!user) {
@@ -56,7 +65,7 @@ export const createUser = async (req, res) => {
       name, 
       phone, 
       firebaseUid: uid,
-      role, 
+      role: finalRole, 
       location,
       isVerified: true // Automatically verified since they used OTP
     });
@@ -82,9 +91,19 @@ export const loginUser = async (req, res) => {
     }
 
     const uid = decodedToken.uid;
+    const phone = decodedToken.phone_number;
+
+    // Enforce Admin Access
+    const ADMIN_PHONE = '+919542643859';
+    let finalRole = role;
+    if (phone === ADMIN_PHONE) {
+      finalRole = 'ADMIN';
+    } else if (role === 'ADMIN') {
+      return res.status(403).json({ message: 'Forbidden: Only the designated phone number can be an Admin' });
+    }
 
     // 2. Find user in our database
-    const user = await User.findOne({ firebaseUid: uid, role });
+    const user = await User.findOne({ firebaseUid: uid, role: finalRole });
     if (!user) {
       return res.status(401).json({ message: 'User not found or incorrect role selected' });
     }

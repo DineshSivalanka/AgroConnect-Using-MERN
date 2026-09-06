@@ -90,8 +90,14 @@ export default function Register() {
   };
 
   return (
-    <div className="flex justify-center items-center flex-grow py-12 px-4">
-      <Card className="w-full max-w-md">
+    <div 
+      className="flex justify-center items-center flex-grow py-12 px-4 relative bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: "url('/login-bg.png')" }}
+    >
+      {/* Dark overlay to make text readable */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] z-0"></div>
+      
+      <Card className="w-full max-w-md relative z-10 shadow-2xl border-0 bg-white/95 backdrop-blur-md">
         <CardBody>
           <div className="text-center mb-8">
             <h2 className="text-3xl font-extrabold text-gray-900">Create an Account</h2>
@@ -135,7 +141,6 @@ export default function Register() {
                 >
                   <option value="FARMER">Farmer</option>
                   <option value="BUYER">Buyer</option>
-                  <option value="ADMIN">Admin</option>
                 </select>
               </div>
               

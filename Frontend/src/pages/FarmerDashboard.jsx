@@ -186,11 +186,11 @@ export default function FarmerDashboard() {
 
   return (
     <div className="space-y-8 animate-fadeIn">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 md:gap-3">
             Welcome, {user.name} 
-            <Sprout className="w-8 h-8 text-green-600" />
+            <Sprout className="w-6 h-6 md:w-8 md:h-8 text-green-600" />
           </h2>
           <p className="text-gray-500 mt-1">Manage your agricultural produce and buyer requests</p>
         </div>
@@ -247,7 +247,7 @@ export default function FarmerDashboard() {
 
         <Card>
           <CardBody>
-            <h3 className="text-2xl font-bold text-gray-900 mb-6">My Products</h3>
+            <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">My Products</h3>
             {products.length === 0 ? (
               <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
                 <Wheat className="w-12 h-12 mx-auto text-green-300 mb-3 block" />
@@ -279,7 +279,7 @@ export default function FarmerDashboard() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-4 sm:mt-0 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                       {p.status === 'AVAILABLE' && (
                         <Button variant="outline" size="sm" onClick={() => handleMarkAsSold(p.id)} className="flex-1 sm:flex-none flex items-center gap-1.5 text-green-600 border-green-200 hover:bg-green-50"><CheckCircle className="w-4 h-4"/> Mark Sold</Button>
                       )}
@@ -295,7 +295,7 @@ export default function FarmerDashboard() {
 
         <Card>
           <CardBody>
-            <h3 className="text-2xl font-bold text-gray-900 mb-6">Buyer Requests</h3>
+            <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">Buyer Requests</h3>
             {requests.length === 0 ? (
               <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
                 <Inbox className="w-12 h-12 mx-auto text-blue-300 mb-3 block" />
@@ -460,7 +460,7 @@ export default function FarmerDashboard() {
               </div>
               <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
                 <Button type="button" variant="ghost" onClick={() => setShowAddModal(false)}>Cancel</Button>
-                <Button type="submit" isLoading={loading}>Save Product</Button>
+                <Button type="submit" isLoading={loading} disabled={isUploading}>Save Product</Button>
               </div>
             </form>
           </div>
@@ -575,7 +575,7 @@ export default function FarmerDashboard() {
               />
               <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
                 <Button type="button" variant="ghost" onClick={() => setShowEditModal(false)}>Cancel</Button>
-                <Button type="submit" isLoading={loading}>Update Product</Button>
+                <Button type="submit" isLoading={loading} disabled={isUploading}>Update Product</Button>
               </div>
             </form>
           </div>

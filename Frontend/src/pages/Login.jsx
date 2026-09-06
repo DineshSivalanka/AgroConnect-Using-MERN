@@ -59,10 +59,14 @@ export default function Login() {
       const result = await confirmationResult.confirm(otp);
       const idToken = await result.user.getIdToken();
       
+      // Check for Admin (silently set role to ADMIN if phone matches)
+      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      const actualRole = (cleanPhone === '919542643859' || cleanPhone === '9542643859') ? 'ADMIN' : role;
+
       // Send token to our backend for verification and login
       const user = await request('/users/login', {
         method: 'POST',
-        body: JSON.stringify({ idToken, role }),
+        body: JSON.stringify({ idToken, role: actualRole }),
       });
       
       localStorage.setItem('user', JSON.stringify(user));
@@ -83,8 +87,14 @@ export default function Login() {
   };
 
   return (
-    <div className="flex justify-center items-center flex-grow py-12 px-4">
-      <Card className="w-full max-w-md">
+    <div 
+      className="flex justify-center items-center flex-grow py-12 px-4 relative bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: "url('/login-bg.png')" }}
+    >
+      {/* Dark overlay to make text readable */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] z-0"></div>
+      
+      <Card className="w-full max-w-md relative z-10 shadow-2xl border-0 bg-white/95 backdrop-blur-md">
         <CardBody>
           <div className="text-center mb-8">
             <h2 className="text-3xl font-extrabold text-gray-900">Welcome Back</h2>
@@ -118,7 +128,6 @@ export default function Login() {
                 >
                   <option value="FARMER">Farmer</option>
                   <option value="BUYER">Buyer</option>
-                  <option value="ADMIN">Admin</option>
                 </select>
               </div>
               
